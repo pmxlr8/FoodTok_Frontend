@@ -10,7 +10,7 @@ FoodTok eliminates decision fatigue by presenting users with a personalized queu
 
 ```bash
 # 1. Clone and enter the project
-git clone <your-repo-url>
+https://github.com/pmxlr8/FoodTok_Frontend.git
 cd FoodTok
 
 # 2. Install dependencies  
@@ -218,7 +218,7 @@ npm --version
 
 1. **Clone this repository**
    ```bash
-   git clone <your-repository-url>
+   https://github.com/pmxlr8/FoodTok_Frontend.git
    cd FoodTok
    ```
 
