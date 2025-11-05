@@ -22,6 +22,7 @@ interface RestaurantCardProps {
   onDragEnd?: () => void;
   isTopCard?: boolean;
   style?: React.CSSProperties;
+  swipeDirection?: 'left' | 'right';
 }
 
 export default function RestaurantCard({ 
@@ -31,7 +32,8 @@ export default function RestaurantCard({
   onDragStart,
   onDragEnd,
   isTopCard = false,
-  style 
+  style,
+  swipeDirection = 'left'
 }: RestaurantCardProps) {
   const { restaurant, reason, matchScore } = card;
   const [isDragging, setIsDragging] = useState(false);
@@ -79,7 +81,6 @@ export default function RestaurantCard({
         y,
         rotate,
         opacity,
-        cursor: isDragging ? 'grabbing' : 'grab',
         zIndex: isTopCard ? 2 : 1,
         ...style
       }}
@@ -88,46 +89,57 @@ export default function RestaurantCard({
       dragElastic={0.1}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      whileTap={{ cursor: 'grabbing' }}
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: isTopCard ? 1 : 0.95, opacity: 1 }}
       exit={{ 
-        x: x.get() > 0 ? 300 : -300,
+        x: swipeDirection === 'right' ? 300 : -300,
         opacity: 0,
         transition: { duration: 0.3 }
       }}
     >
       <Card 
-        className="h-full overflow-hidden bg-white dark:bg-gray-900 shadow-2xl relative border-0"
+        className="h-full overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 shadow-2xl relative border-0"
       >
-        {/* Clickable overlay for card tap - excludes button area */}
-        <div 
-          className="absolute inset-0 z-30 cursor-pointer" 
-          onClick={!isDragging ? onCardClick : undefined}
-          style={{ 
-            pointerEvents: isDragging ? 'none' : 'auto',
-            bottom: '80px' // Exclude button area from click
-          }}
-        />
-        
-        {/* Swipe indicators */}
+        {/* Swipe indicators - must be BEFORE clickable overlay and non-interactive */}
         <motion.div
-          className="absolute inset-0 bg-green-500/20 z-10 flex items-center justify-center"
-          style={{ opacity: likeOpacity }}
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ 
+            opacity: likeOpacity, 
+            pointerEvents: 'none',
+            zIndex: 5 
+          }}
         >
-          <div className="bg-green-500 text-white p-4 rounded-full">
+          <div className="bg-green-500/20 absolute inset-0" />
+          <div className="bg-green-500 text-white p-4 rounded-full relative z-10">
             <Heart className="h-8 w-8 fill-current" />
           </div>
         </motion.div>
         
         <motion.div
-          className="absolute inset-0 bg-red-500/20 z-10 flex items-center justify-center"
-          style={{ opacity: passOpacity }}
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ 
+            opacity: passOpacity, 
+            pointerEvents: 'none',
+            zIndex: 5 
+          }}
         >
-          <div className="bg-red-500 text-white p-4 rounded-full">
+          <div className="bg-red-500/20 absolute inset-0" />
+          <div className="bg-red-500 text-white p-4 rounded-full relative z-10">
             <X className="h-8 w-8" />
           </div>
         </motion.div>
+        
+        {/* Clickable overlay for card tap - only covers image area */}
+        <div 
+          className="absolute top-0 left-0 right-0" 
+          onClick={!isDragging ? onCardClick : undefined}
+          style={{ 
+            pointerEvents: isDragging ? 'none' : 'auto',
+            height: '256px', // Same as image height (h-64 = 16rem = 256px)
+            cursor: isDragging ? 'grabbing' : 'pointer',
+            zIndex: 10
+          }}
+        />
 
         {/* Match score badge */}
         <div className="absolute top-4 right-4 z-20 bg-primary text-white px-2 py-1 rounded-full text-sm font-medium">
@@ -161,9 +173,9 @@ export default function RestaurantCard({
           </div>
         </div>
 
-        <CardContent className="p-4 space-y-3 bg-white dark:bg-gray-900 relative z-10">
+        <CardContent className="p-4 space-y-3 bg-gradient-to-b from-gray-900 to-black relative z-20">
           {/* Restaurant description */}
-          <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-2 leading-relaxed font-medium">
+          <p className="text-gray-300 text-sm line-clamp-2 leading-relaxed font-medium">
             {restaurant.description}
           </p>
 
@@ -172,7 +184,7 @@ export default function RestaurantCard({
             {restaurant.cuisine.slice(0, 3).map((cuisine) => (
               <span
                 key={cuisine}
-                className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs rounded-full font-medium"
+                className="px-2 py-1 bg-gray-800 text-gray-200 text-xs rounded-full font-medium border border-gray-700"
               >
                 {capitalizeWords(cuisine)}
               </span>
@@ -181,12 +193,12 @@ export default function RestaurantCard({
 
           {/* Restaurant details */}
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
               <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">{restaurant.location.address}, {restaurant.location.city}</span>
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
               <Clock className="h-3.5 w-3.5 flex-shrink-0" />
               <span>Open until 10:00 PM</span>
             </div>
@@ -194,15 +206,15 @@ export default function RestaurantCard({
 
           {/* AI recommendation reason */}
           {reason && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
-              <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
+            <div className="bg-blue-900/30 border border-blue-800/50 p-3 rounded-lg mb-4">
+              <p className="text-sm text-blue-300 leading-relaxed">
                 <span className="font-medium">Why we picked this:</span> {reason}
               </p>
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="flex gap-4 pt-4 relative z-20">
+          <div className="flex gap-4 pt-4" style={{ position: 'relative', zIndex: 30 }}>
             <Button
               variant="outline"
               size="lg"

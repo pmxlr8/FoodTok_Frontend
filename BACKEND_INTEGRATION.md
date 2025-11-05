@@ -1,6 +1,36 @@
 # 🔌 Backend Integration Guide
 
-**For Backend Developers: How to Connect Your APIs to This Frontend**
+**Complete Reference for Backend, Infrastructure, and Database Teams**
+
+---
+
+## 📊 Executive Summary
+
+This document provides **everything** needed to build a production-ready backend for FoodTok. The frontend is 100% complete and uses mock APIs. Your mission: implement 8 real API endpoints that match the mock interface exactly.
+
+### What's Built (Frontend - 100% Complete)
+✅ Authentication (login/signup/onboarding)  
+✅ Restaurant discovery queue (TikTok-style swiping)  
+✅ Restaurant details pages  
+✅ Table reservation system with 10-minute hold timer  
+✅ Shopping cart & checkout  
+✅ User favorites & order history  
+✅ Profile & settings management  
+✅ All UI components, animations, and state management  
+
+### What's Needed (Backend - Your Responsibility)
+🔧 8 RESTful API endpoints (detailed below)  
+🔧 PostgreSQL database with 5 core tables  
+🔧 Redis for distributed locking (race condition prevention)  
+🔧 Stripe integration for payment processing  
+🔧 User authentication with JWT tokens  
+🔧 Background job system for hold cleanup  
+
+### Integration Effort
+- **Setup**: 15 minutes (clone repo, test frontend)
+- **Backend Development**: 1-2 weeks
+- **Integration**: 1 day (change 3 lines of frontend code)
+- **Testing & Deployment**: 2-3 days
 
 ---
 
@@ -886,7 +916,288 @@ STRIPE_SECRET_KEY = "sk_test_..."
 
 ---
 
-## 📞 Support
+## � Frontend State Management (What's Saved Where)
+
+### localStorage (Currently Used by Frontend)
+The frontend uses Zustand with persistence middleware to save data in browser localStorage:
+
+**Key: `foodtok-auth`**
+```json
+{
+  "state": {
+    "user": {
+      "id": "user_123",
+      "email": "demo@example.com",
+      "firstName": "Demo",
+      "lastName": "User",
+      "preferences": {
+        "cuisines": ["Italian", "Japanese"],
+        "dietaryRestrictions": ["Vegetarian"],
+        "priceRange": "$$",
+        "maxDistance": 10,
+        "favoriteRestaurants": ["rest_001", "rest_002"]
+      }
+    },
+    "isAuthenticated": true
+  }
+}
+```
+
+**Key: `foodtok-cart`**
+```json
+{
+  "state": {
+    "items": [
+      {
+        "id": "item_001",
+        "restaurantId": "rest_001",
+        "name": "Margherita Pizza",
+        "price": 18,
+        "quantity": 2
+      }
+    ],
+    "restaurantId": "rest_001"
+  }
+}
+```
+
+**Key: `foodtok-discovery`**
+```json
+{
+  "state": {
+    "swipeHistory": [
+      {
+        "restaurantId": "rest_001",
+        "action": "like",
+        "timestamp": 1699123456789
+      },
+      {
+        "restaurantId": "rest_002",
+        "action": "pass",
+        "timestamp": 1699123457000
+      }
+    ]
+  }
+}
+```
+
+### What Needs Backend Persistence
+When you integrate the real API, these should be stored in your database:
+- ✅ User profile and preferences
+- ✅ Swipe history (for recommendation algorithm)
+- ✅ Favorites list
+- ✅ Reservations and holds
+- ✅ Order history
+- ✅ Cart items (optional - can stay in localStorage for performance)
+
+---
+
+## 🎯 Match Percentage Logic
+
+### Current Implementation (Mock Data)
+The frontend displays match percentages (e.g., "92% match") but currently these are **hardcoded random values** in the mock data:
+
+```typescript
+// src/lib/api/mock-restaurants.ts
+{
+  restaurant: {...},
+  matchScore: 92,  // ← Hardcoded!
+  matchReason: "Loves Italian cuisine • Romantic atmosphere"  // ← Hardcoded!
+}
+```
+
+### Backend Implementation Needed
+You need to implement a real matching algorithm based on user preferences:
+
+```python
+def calculate_match_score(user_preferences, restaurant):
+    """
+    Calculate how well a restaurant matches user preferences
+    Returns: integer 0-100
+    """
+    score = 0
+    
+    # Cuisine match (40 points)
+    user_cuisines = set(user_preferences['cuisines'])
+    restaurant_cuisines = set(restaurant['cuisine'])
+    if user_cuisines & restaurant_cuisines:  # Any overlap?
+        overlap_ratio = len(user_cuisines & restaurant_cuisines) / len(user_cuisines)
+        score += int(40 * overlap_ratio)
+    
+    # Price range match (20 points)
+    if user_preferences['priceRange'] == restaurant['priceRange']:
+        score += 20
+    elif abs(price_to_number(user_preferences['priceRange']) - 
+             price_to_number(restaurant['priceRange'])) == 1:
+        score += 10  # Close match
+    
+    # Distance (20 points)
+    distance = restaurant['location']['distance']
+    max_distance = user_preferences['maxDistance']
+    if distance <= max_distance:
+        score += int(20 * (1 - distance / max_distance))
+    
+    # Rating (20 points)
+    score += int(20 * (restaurant['rating'] / 5.0))
+    
+    # Bonus: Previously liked similar restaurants (+10)
+    # Check if user liked restaurants with same cuisine before
+    
+    return min(100, score)
+
+def generate_match_reason(user_preferences, restaurant, score):
+    """
+    Generate human-readable explanation for the match
+    Returns: string like "Loves Italian cuisine • Romantic atmosphere"
+    """
+    reasons = []
+    
+    # Cuisine match
+    matching_cuisines = set(user_preferences['cuisines']) & set(restaurant['cuisine'])
+    if matching_cuisines:
+        reasons.append(f"Loves {', '.join(matching_cuisines)}")
+    
+    # Features
+    if 'Romantic' in restaurant.get('features', []):
+        reasons.append("Romantic atmosphere")
+    
+    # High rating
+    if restaurant['rating'] >= 4.5:
+        reasons.append(f"{restaurant['rating']}★ rated")
+    
+    # Within distance
+    if restaurant['location']['distance'] <= 2:
+        reasons.append(f"Only {restaurant['location']['distance']}mi away")
+    
+    return " • ".join(reasons[:3])  # Max 3 reasons
+```
+
+### API Response Format
+```json
+{
+  "restaurant": {...},
+  "matchScore": 92,
+  "matchReason": "Loves Italian cuisine • Romantic atmosphere • 4.7★ rated"
+}
+```
+
+---
+
+## 🔘 Button Actions & UI Logic
+
+### Discovery Page Buttons
+
+**Like Button (Green Heart)**
+- **Action**: Swipe right / Click like button
+- **Frontend Logic**: 
+  ```typescript
+  // Adds to swipe history
+  discovery.addSwipe(restaurantId, 'right')
+  // Adds to favorites
+  auth.addFavorite(restaurantId)
+  ```
+- **Backend Needed**:
+  ```
+  POST /api/users/{userId}/favorites
+  { "restaurantId": "rest_001" }
+  ```
+
+**Pass Button (Red X)**
+- **Action**: Swipe left / Click pass button
+- **Frontend Logic**:
+  ```typescript
+  // Adds to swipe history with 'left' action
+  discovery.addSwipe(restaurantId, 'left')
+  ```
+- **Backend Needed**:
+  ```
+  POST /api/users/{userId}/swipes
+  { "restaurantId": "rest_001", "action": "pass" }
+  ```
+
+**Undo Button**
+- **Action**: Reverses last swipe
+- **Frontend Logic**: Pops last item from swipe history
+- **Backend Needed**: DELETE last swipe record
+
+**Refresh Button**
+- **Action**: Gets new restaurant recommendations
+- **Frontend Logic**: Fetches new discovery queue
+- **Backend Needed**: 
+  ```
+  GET /api/restaurants/discovery?userId={userId}&limit=20
+  ```
+
+### Restaurant Details Page
+
+**Reserve Table Button**
+- **Action**: Opens reservation modal
+- **Frontend Logic**: Shows modal with date/time picker
+- **Backend Needed**: Check availability endpoint
+
+**Add to Favorites (Heart Icon)**
+- **Action**: Toggles favorite status
+- **Frontend Logic**: Adds/removes from favorites list
+- **Backend Needed**: POST/DELETE to favorites endpoint
+
+### Favorites Page
+
+**Heart Icon (Filled)**
+- **Action**: Remove from favorites
+- **Frontend Logic**: Removes from favorites list
+- **Backend Needed**: 
+  ```
+  DELETE /api/users/{userId}/favorites/{restaurantId}
+  ```
+
+### Reservations Page
+
+**View Reservation**
+- **Action**: Shows confirmation code and details
+- **Frontend Logic**: Displays reservation data
+- **Backend Needed**: GET reservation by ID
+
+**Cancel Reservation**
+- **Action**: Cancels booking and processes refund
+- **Frontend Logic**: Shows confirmation dialog
+- **Backend Needed**:
+  ```
+  DELETE /api/reservations/{reservationId}
+  Response: { refundAmount: 50, refundPercentage: 100 }
+  ```
+
+---
+
+## 🚨 Current Frontend Limitations & Fixes Needed
+
+### User Name Display
+**Issue**: Currently shows "User!" in header because mock API returns firstName: "Demo"
+**Why**: The signup form collects firstName/lastName but mock API doesn't use them
+**Fix**: Backend must save and return actual user data from signup:
+```python
+# In signup endpoint
+user = User.objects.create(
+    email=request.data['email'],
+    first_name=request.data['firstName'],  # Use actual data!
+    last_name=request.data['lastName']
+)
+```
+
+### Data Persistence
+**Issue**: All data is in localStorage - lost if user clears browser or switches devices
+**Fix**: Backend must persist everything to database
+
+### Authentication
+**Issue**: Mock login accepts ANY email with password "password123"
+**Fix**: Real password hashing and validation needed:
+```python
+from django.contrib.auth import authenticate
+user = authenticate(email=email, password=password)
+```
+
+---
+
+## �📞 Support
 
 **Questions about integration?**
 - Read `INTERNAL_README.md` for architecture details
@@ -894,8 +1205,7 @@ STRIPE_SECRET_KEY = "sk_test_..."
 - Check `src/types/reservation.ts` for all type definitions
 - Ask in team channel
 
-**Frontend Lead:** Pranjal Mishra  
-**Backend Lead:** Ren (Auth), Yuxuan/Aaron (APIs)
+
 
 ---
 

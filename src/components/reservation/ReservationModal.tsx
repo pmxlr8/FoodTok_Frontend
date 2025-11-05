@@ -142,6 +142,7 @@ export default function ReservationModal({
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            style={{ pointerEvents: 'auto' }}
           />
 
           {/* Modal */}
@@ -149,10 +150,11 @@ export default function ReservationModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-lg bg-gray-900 rounded-2xl shadow-2xl z-50 max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="relative h-32 bg-gradient-to-br from-blue-600 to-blue-700">
+            <div className="relative h-32 bg-gradient-to-br from-primary to-primary/80">
               <img 
                 src={restaurantImage} 
                 alt={restaurantName}
@@ -171,16 +173,16 @@ export default function ReservationModal({
             </div>
 
             {/* Progress Steps */}
-            <div className="flex items-center justify-center gap-2 py-4 bg-gray-50">
-              <div className={`flex items-center gap-2 ${step >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}>
+            <div className="flex items-center justify-center gap-2 py-4 bg-gray-800 border-b border-gray-700">
+              <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-gray-500'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-primary text-white' : 'bg-gray-700 text-gray-400'}`}>
                   1
                 </div>
                 <span className="text-sm font-medium hidden sm:inline">Date & Party</span>
               </div>
-              <ChevronRight className="text-gray-400" size={16} />
-              <div className={`flex items-center gap-2 ${step >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}>
+              <ChevronRight className="text-gray-600" size={16} />
+              <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-gray-500'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-primary text-white' : 'bg-gray-700 text-gray-400'}`}>
                   2
                 </div>
                 <span className="text-sm font-medium hidden sm:inline">Select Time</span>
@@ -188,7 +190,7 @@ export default function ReservationModal({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-900">
               {/* Error Message */}
               {error && (
                 <motion.div
@@ -206,7 +208,7 @@ export default function ReservationModal({
                 <div className="space-y-6">
                   {/* Date Selection */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-200 mb-3">
                       <Calendar size={18} />
                       Select Date
                     </label>
@@ -217,11 +219,11 @@ export default function ReservationModal({
                           onClick={() => setSelectedDate(date.value)}
                           className={`p-3 rounded-xl border-2 text-left transition-all ${
                             selectedDate === date.value
-                              ? 'border-blue-600 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-300'
+                              ? 'border-primary bg-primary text-white shadow-lg scale-105'
+                              : 'border-gray-600 dark:border-gray-600 bg-gray-800 dark:bg-gray-800 hover:border-primary hover:bg-gray-700'
                           }`}
                         >
-                          <div className="text-xs text-gray-500">{date.dayOfWeek}</div>
+                          <div className="text-xs opacity-80">{date.dayOfWeek}</div>
                           <div className="font-semibold text-sm">{date.label}</div>
                         </button>
                       ))}
@@ -230,7 +232,7 @@ export default function ReservationModal({
 
                   {/* Party Size */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-200 mb-3">
                       <Users size={18} />
                       Party Size
                     </label>
@@ -238,18 +240,18 @@ export default function ReservationModal({
                       <button
                         onClick={() => setPartySize(Math.max(1, partySize - 1))}
                         disabled={partySize <= 1}
-                        className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
                       >
                         −
                       </button>
                       <div className="flex-1 text-center">
-                        <div className="text-3xl font-bold text-blue-600">{partySize}</div>
-                        <div className="text-xs text-gray-500">guests</div>
+                        <div className="text-3xl font-bold text-primary">{partySize}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">guests</div>
                       </div>
                       <button
                         onClick={() => setPartySize(Math.min(20, partySize + 1))}
                         disabled={partySize >= 20}
-                        className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
                       >
                         +
                       </button>
@@ -257,12 +259,12 @@ export default function ReservationModal({
                   </div>
 
                   {/* Deposit Info */}
-                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                    <div className="text-sm text-gray-600 mb-1">Deposit Required:</div>
-                    <div className="text-xl font-bold text-blue-600">
+                  <div className="p-4 bg-gray-800 rounded-xl border border-primary/30">
+                    <div className="text-sm text-gray-300 mb-1">Deposit Required:</div>
+                    <div className="text-xl font-bold text-primary">
                       ${25} per person × {partySize} = ${25 * partySize}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-400 mt-1">
                       This reserves your table. Refundable with 24hr notice.
                     </div>
                   </div>
@@ -272,7 +274,7 @@ export default function ReservationModal({
               {/* Step 2: Time Selection */}
               {step === 2 && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-200">
                     <Clock size={18} />
                     Available Times for {dates.find(d => d.value === selectedDate)?.label}
                   </div>
@@ -284,12 +286,12 @@ export default function ReservationModal({
                         onClick={() => setSelectedTime(slot.time)}
                         className={`p-3 rounded-xl border-2 transition-all ${
                           selectedTime === slot.time
-                            ? 'border-blue-600 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
+                            ? 'border-primary bg-primary text-white shadow-lg scale-105'
+                            : 'border-gray-600 bg-gray-800 hover:border-primary hover:bg-gray-700'
                         }`}
                       >
                         <div className="text-lg font-bold">{slot.time}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs opacity-80">
                           {slot.remainingCapacity} tables
                         </div>
                       </button>
@@ -298,7 +300,7 @@ export default function ReservationModal({
 
                   <button
                     onClick={() => setStep(1)}
-                    className="w-full py-2 text-sm text-gray-600 hover:text-gray-800"
+                    className="w-full py-2 text-sm text-gray-400 hover:text-gray-200"
                   >
                     ← Change Date or Party Size
                   </button>
@@ -307,11 +309,11 @@ export default function ReservationModal({
             </div>
 
             {/* Footer */}
-            <div className="p-6 bg-gray-50 border-t">
+            <div className="p-6 bg-gray-800 border-t border-gray-700">
               <button
                 onClick={step === 1 ? handleCheckAvailability : handleCreateHold}
                 disabled={loading || (step === 1 ? !selectedDate : !selectedTime)}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">

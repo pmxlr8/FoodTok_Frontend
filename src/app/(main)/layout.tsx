@@ -39,17 +39,13 @@ export default function MainLayout({
     const timer = setTimeout(() => {
       if (!isAuthenticated) {
         router.replace('/login');
-      } else if (user && pathname === '/') {
-        // Check if user needs onboarding when on root path
-        const hasPreferences = user.preferences?.cuisines?.length > 0;
-        if (!hasPreferences) {
-          router.replace('/onboarding');
-        }
       }
+      // Don't redirect to onboarding automatically - let user navigate manually if needed
+      // This prevents infinite loops when preferences fail to save
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user, pathname, router]);
+  }, [isAuthenticated, router]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -69,8 +65,8 @@ export default function MainLayout({
           </Link>
           
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-muted-foreground">
-              Hi, {user.firstName}!
+            <span className="text-sm text-foreground font-medium">
+              Hi, {user.firstName || 'User'}!
             </span>
             <Link href="/settings">
               <Button variant="ghost" size="icon">

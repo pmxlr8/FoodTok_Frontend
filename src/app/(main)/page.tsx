@@ -31,6 +31,7 @@ export default function DiscoveryPage() {
   
   const [cardKey, setCardKey] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [lastSwipeDirection, setLastSwipeDirection] = useState<'left' | 'right'>('left');
   
   useEffect(() => {
     // Load initial queue when component mounts
@@ -43,8 +44,14 @@ export default function DiscoveryPage() {
     const currentCard = getCurrentCard();
     if (!currentCard) return;
     
-    swipeCard(direction, currentCard.restaurant.id);
-    setCardKey(prev => prev + 1); // Force re-render for animation
+    // Set direction first, then trigger the card change
+    setLastSwipeDirection(direction);
+    
+    // Small delay to ensure state is updated before card key changes
+    requestAnimationFrame(() => {
+      swipeCard(direction, currentCard.restaurant.id);
+      setCardKey(prev => prev + 1);
+    });
   };
 
   const handleCardClick = () => {
@@ -153,13 +160,14 @@ export default function DiscoveryPage() {
             {/* Only show current card to prevent transparency issues */}
             {currentCard && (
               <RestaurantCard
-                key={`current-${currentCard.restaurant.id}-${cardKey}`}
+                key={`card-${currentIndex}-${cardKey}`}
                 card={currentCard}
                 onSwipe={handleSwipe}
                 onCardClick={handleCardClick}
                 onDragStart={() => setIsDragging(true)}
                 onDragEnd={() => setIsDragging(false)}
                 isTopCard={true}
+                swipeDirection={lastSwipeDirection}
               />
             )}
           </AnimatePresence>

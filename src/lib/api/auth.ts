@@ -63,9 +63,52 @@ export async function signupUser(userData: any): Promise<{ success: boolean; dat
 export async function updateUserPreferences(userId: string, preferences: Partial<UserPreferences>): Promise<{ success: boolean; data?: User; error?: string }> {
   await delay(300);
   
+  // Get stored user from localStorage
+  const storedAuth = localStorage.getItem('foodtok-auth');
+  if (storedAuth) {
+    try {
+      const authState = JSON.parse(storedAuth);
+      const currentUser = authState.state?.user;
+      
+      if (currentUser && currentUser.id === userId) {
+        // Merge new preferences with existing ones
+        const updatedUser: User = {
+          ...currentUser,
+          preferences: {
+            ...currentUser.preferences,
+            ...preferences
+          },
+          updatedAt: new Date()
+        };
+        
+        return {
+          success: true,
+          data: updatedUser
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing stored auth:', error);
+    }
+  }
+  
+  // Fallback: return basic user with preferences
   return {
     success: true,
-    data: {} as User // Will be updated by the store
+    data: {
+      id: userId,
+      email: 'demo@example.com',
+      firstName: 'Demo',
+      lastName: 'User',
+      preferences: {
+        cuisines: preferences.cuisines || [],
+        dietaryRestrictions: preferences.dietaryRestrictions || [],
+        priceRange: preferences.priceRange || '$$',
+        maxDistance: preferences.maxDistance || 10,
+        favoriteRestaurants: []
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as User
   };
 }
 

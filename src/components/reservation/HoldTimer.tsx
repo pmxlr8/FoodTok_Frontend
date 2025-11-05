@@ -41,77 +41,103 @@ export default function HoldTimer({ hold, onExpired }: HoldTimerProps) {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`sticky top-0 z-30 p-4 shadow-lg ${
-        isCritical
-          ? 'bg-red-600'
-          : isUrgent
-          ? 'bg-orange-500'
-          : 'bg-blue-600'
-      }`}
+      className="sticky top-0 z-30 p-4"
     >
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between text-white">
-          <div className="flex items-center gap-3">
-            {isUrgent ? (
+      <div className="max-w-4xl mx-auto bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center justify-between text-white">
+            <div className="flex items-center gap-3">
               <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
+                animate={isUrgent ? { scale: [1, 1.15, 1] } : {}}
                 transition={{ repeat: Infinity, duration: 1 }}
+                className={`p-2 rounded-xl ${
+                  isCritical
+                    ? 'bg-red-500/20'
+                    : isUrgent
+                    ? 'bg-orange-500/20'
+                    : 'bg-primary/20'
+                }`}
               >
-                <AlertTriangle size={24} />
+                {isUrgent ? (
+                  <AlertTriangle 
+                    size={20} 
+                    className={isCritical ? 'text-red-400' : 'text-orange-400'} 
+                  />
+                ) : (
+                  <Clock size={20} className="text-primary" />
+                )}
               </motion.div>
-            ) : (
-              <Clock size={24} />
-            )}
-            <div>
-              <div className="text-sm opacity-90">
-                {isCritical
-                  ? '⚠️ EXPIRING SOON!'
+              <div>
+                <div className={`text-sm font-semibold ${
+                  isCritical
+                    ? 'text-red-400'
+                    : isUrgent
+                    ? 'text-orange-400'
+                    : 'text-gray-200'
+                }`}>
+                  {isCritical
+                    ? '⚠️ EXPIRING SOON!'
+                    : isUrgent
+                    ? '⚠️ Almost out of time!'
+                    : '⏰ Hold Active'}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Complete payment to secure your reservation
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <div className={`text-3xl font-bold font-mono ${
+                isCritical
+                  ? 'text-red-400'
                   : isUrgent
-                  ? '⚠️ Almost out of time!'
-                  : '⏰ Hold Active'}
+                  ? 'text-orange-400'
+                  : 'text-primary'
+              }`}>
+                {minutes}:{seconds.toString().padStart(2, '0')}
               </div>
-              <div className="text-xs opacity-75">
-                Complete payment to secure your reservation
-              </div>
+              <div className="text-xs text-gray-400">remaining</div>
             </div>
           </div>
 
-          <div className="text-right">
-            <div className="text-3xl font-bold font-mono">
-              {minutes}:{seconds.toString().padStart(2, '0')}
-            </div>
-            <div className="text-xs opacity-75">remaining</div>
+          {/* Progress Bar */}
+          <div className="mt-4 h-3 bg-gray-700 rounded-full overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${
+                isCritical
+                  ? 'bg-gradient-to-r from-red-500 to-red-600'
+                  : isUrgent
+                  ? 'bg-gradient-to-r from-orange-500 to-orange-600'
+                  : 'bg-gradient-to-r from-primary to-blue-500'
+              }`}
+              initial={{ width: '100%' }}
+              animate={{ width: `${percentage}%` }}
+              transition={{ duration: 0.5 }}
+            />
           </div>
-        </div>
 
-        {/* Progress Bar */}
-        <div className="mt-3 h-2 bg-white/20 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-white"
-            initial={{ width: '100%' }}
-            animate={{ width: `${percentage}%` }}
-            transition={{ duration: 0.5 }}
-          />
+          {/* Warning Messages */}
+          {isUrgent && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className={`mt-3 text-xs font-medium ${
+                isCritical ? 'text-red-400' : 'text-orange-400'
+              }`}
+            >
+              {isCritical ? (
+                <span>
+                  🔥 Your hold will expire in less than 1 minute! Complete payment now to keep your table.
+                </span>
+              ) : (
+                <span>
+                  ⚡ Only {minutes} minute{minutes !== 1 ? 's' : ''} left to complete your reservation.
+                </span>
+              )}
+            </motion.div>
+          )}
         </div>
-
-        {/* Warning Messages */}
-        {isUrgent && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mt-2 text-xs text-white/90"
-          >
-            {isCritical ? (
-              <span className="font-semibold">
-                Your hold will expire in less than 1 minute! Complete payment now to keep your table.
-              </span>
-            ) : (
-              <span>
-                Only {minutes} minute{minutes !== 1 ? 's' : ''} left to complete your reservation.
-              </span>
-            )}
-          </motion.div>
-        )}
       </div>
     </motion.div>
   );
