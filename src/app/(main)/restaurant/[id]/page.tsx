@@ -44,6 +44,20 @@ export default function RestaurantDetailsPage() {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [reservationModalOpen, setReservationModalOpen] = useState(false);
 
+  async function getRestaurants() {
+    try {
+      const res = await fetch("http://localhost:8080/api/restaurants");
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log(data);
+    } catch (err) {
+      console.error("Failed to fetch restaurants:", err);
+    }
+  }
+
   useEffect(() => {
     const fetchRestaurant = async () => {
       if (!params.id) return;
@@ -142,6 +156,7 @@ export default function RestaurantDetailsPage() {
           variant="secondary"
           size="icon"
           className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm"
+          onClick={() => getRestaurants()}
         >
           <Heart className="h-4 w-4" />
         </Button>
