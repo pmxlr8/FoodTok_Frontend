@@ -1,20 +1,17 @@
 /**
  * Real Reservation API Client
  * 
- * TEMPLATE FILE - Implement these functions when backend is ready
+ * Implements actual HTTP requests to backend reservation endpoints
  * 
- * This file should mirror the mock-reservations.ts interface exactly,
- * but make real HTTP requests to your backend.
- * 
- * Backend Endpoints Required:
- * - POST   /api/reservations/availability
- * - POST   /api/reservations/hold
- * - GET    /api/reservations/hold/active?userId=X
- * - POST   /api/reservations/confirm
- * - GET    /api/reservations/user/:userId
- * - GET    /api/reservations/:id
- * - PATCH  /api/reservations/:id
- * - DELETE /api/reservations/:id
+ * Backend Endpoints:
+ * - POST   /api/reservations/availability - Check available time slots
+ * - POST   /api/reservations/hold        - Create 10-min hold on table
+ * - GET    /api/reservations/hold/active - Get user's active hold
+ * - POST   /api/reservations/confirm     - Pay deposit and confirm
+ * - GET    /api/reservations/user/:id    - Get user's reservations
+ * - GET    /api/reservations/:id         - Get reservation details
+ * - PATCH  /api/reservations/:id         - Modify reservation
+ * - DELETE /api/reservations/:id         - Cancel reservation
  */
 
 import { apiRequest } from './index';
@@ -33,15 +30,31 @@ import {
 
 /**
  * Check available time slots for a restaurant
- * GET /api/reservations/availability
+ * POST /api/reservations/availability
  */
 export async function checkAvailability(
   request: CheckAvailabilityRequest
 ): Promise<AvailabilityResponse> {
-  return apiRequest('/reservations/availability', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
+  try {
+    const response = await apiRequest('/reservations/availability', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+    
+    // Backend returns 'availableSlots', frontend expects 'slots'
+    // Also add missing deposit info
+    return {
+      restaurantId: response.restaurantId,
+      date: response.date,
+      partySize: request.partySize,
+      slots: response.availableSlots || response.slots || [],
+      depositPerPerson: response.depositPerPerson || 25,
+      totalDeposit: response.totalDeposit || (25 * request.partySize),
+    };
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    throw error;
+  }
 }
 
 /**
@@ -51,10 +64,15 @@ export async function checkAvailability(
 export async function createHold(
   request: CreateHoldRequest
 ): Promise<HoldResponse> {
-  return apiRequest('/reservations/hold', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
+  try {
+    return await apiRequest('/reservations/hold', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  } catch (error) {
+    console.error('Error creating hold:', error);
+    throw error;
+  }
 }
 
 /**
@@ -64,7 +82,18 @@ export async function createHold(
 export async function getUserActiveHold(
   userId: string
 ): Promise<Hold | null> {
-  return apiRequest(`/reservations/hold/active?userId=${userId}`);
+  try {
+    const result = await apiRequest(`/reservations/hold/active?userId=${userId}`);
+    return result || null;
+  } catch (error) {
+    console.error('Error fetching active hold:', error);
+    // Return null if no active hold found (404 is expected or empty response)
+    const errorMsg = (error as any)?.message || '';
+    if (errorMsg.includes('404') || errorMsg.includes('Unexpected') || errorMsg.includes('JSON')) {
+      return null;
+    }
+    return null; // Default to null for any error
+  }
 }
 
 /**
@@ -74,10 +103,15 @@ export async function getUserActiveHold(
 export async function confirmReservation(
   request: ConfirmReservationRequest
 ): Promise<ReservationResponse> {
-  return apiRequest('/reservations/confirm', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
+  try {
+    return await apiRequest('/reservations/confirm', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  } catch (error) {
+    console.error('Error confirming reservation:', error);
+    throw error;
+  }
 }
 
 /**
@@ -88,7 +122,12 @@ export async function getUserReservations(
   userId: string,
   filter: 'upcoming' | 'past' = 'upcoming'
 ): Promise<ReservationListItem[]> {
-  return apiRequest(`/reservations/user/${userId}?filter=${filter}`);
+  try {
+    return await apiRequest(`/reservations/user/${userId}?filter=${filter}`);
+  } catch (error) {
+    console.error('Error fetching user reservations:', error);
+    throw error;
+  }
 }
 
 /**
@@ -99,7 +138,12 @@ export async function getReservationById(
   reservationId: string,
   userId: string
 ): Promise<Reservation> {
-  return apiRequest(`/reservations/${reservationId}?userId=${userId}`);
+  try {
+    return await apiRequest(`/reservations/${reservationId}?userId=${userId}`);
+  } catch (error) {
+    console.error('Error fetching reservation:', error);
+    throw error;
+  }
 }
 
 /**
@@ -111,10 +155,15 @@ export async function modifyReservation(
   userId: string,
   changes: ModifyReservationRequest
 ): Promise<Reservation> {
-  return apiRequest(`/reservations/${reservationId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ userId, ...changes }),
-  });
+  try {
+    return await apiRequest(`/reservations/${reservationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, ...changes }),
+    });
+  } catch (error) {
+    console.error('Error modifying reservation:', error);
+    throw error;
+  }
 }
 
 /**
@@ -130,8 +179,13 @@ export async function cancelReservation(
   refundAmount: number;
   refundPercentage: number;
 }> {
-  return apiRequest(`/reservations/${reservationId}`, {
-    method: 'DELETE',
-    body: JSON.stringify({ userId }),
-  });
+  try {
+    return await apiRequest(`/reservations/${reservationId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ userId }),
+    });
+  } catch (error) {
+    console.error('Error canceling reservation:', error);
+    throw error;
+  }
 }

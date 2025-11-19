@@ -36,7 +36,7 @@ export default function DiscoveryPage() {
   useEffect(() => {
     // Load initial queue when component mounts
     if (user && queue.length === 0) {
-      loadQueue(user.id);
+      loadQueue(user.id, user.preferences);
     }
   }, [user, queue.length, loadQueue]);
 
@@ -64,7 +64,7 @@ export default function DiscoveryPage() {
 
   const handleRefresh = () => {
     if (user) {
-      loadQueue(user.id);
+      loadQueue(user.id, user.preferences);
       setCardKey(prev => prev + 1);
     }
   };

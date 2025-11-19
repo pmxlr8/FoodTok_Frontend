@@ -9,10 +9,10 @@ import type { TimeSlot, Hold } from '@/types/reservation';
 interface ReservationModalProps {
   restaurantId: string;
   restaurantName: string;
-  restaurantImage: string;
+  restaurantImage?: string;
   isOpen: boolean;
   onClose: () => void;
-  onHoldCreated: (hold: Hold) => void;
+  onHoldCreated: (holdData: any) => void;
 }
 
 export default function ReservationModal({
@@ -72,19 +72,26 @@ export default function ReservationModal({
         partySize,
       });
 
-      setAvailableSlots(result.slots.filter((s: any) => s.available));
+      console.log('📅 Availability result:', result);
+
+      // Handle cases where slots might be undefined or null
+      const slots = result?.slots || [];
+      const availableSlots = slots.filter((s: any) => s.available);
+      
+      setAvailableSlots(availableSlots);
       setDepositInfo({
-        perPerson: result.depositPerPerson,
-        total: result.totalDeposit,
+        perPerson: result?.depositPerPerson || 25,
+        total: result?.totalDeposit || (25 * partySize),
       });
       
-      if (result.slots.filter((s: any) => s.available).length === 0) {
+      if (availableSlots.length === 0) {
         setError('No availability for this date. Please try another day.');
       } else {
         setStep(2);
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ Availability check error:', err);
+      setError(err.message || 'Failed to check availability. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -109,7 +116,17 @@ export default function ReservationModal({
         partySize,
       });
 
-      onHoldCreated(result.hold);
+      // Pass full context including restaurant info
+      const holdWithContext = {
+        hold: result.hold,
+        restaurantName,
+        restaurantImage: restaurantImage || '',
+        totalDeposit: depositInfo.total || (depositInfo.perPerson * partySize) || 50
+      };
+
+      console.log('📤 Passing hold to parent with context:', holdWithContext);
+      console.log('📤 Hold expiresAt:', result.hold.expiresAt);
+      onHoldCreated(holdWithContext);
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -155,11 +172,17 @@ export default function ReservationModal({
           >
             {/* Header */}
             <div className="relative h-32 bg-gradient-to-br from-primary to-primary/80">
-              <img 
-                src={restaurantImage} 
-                alt={restaurantName}
-                className="w-full h-full object-cover opacity-50"
-              />
+              {restaurantImage ? (
+                <img 
+                  src={restaurantImage} 
+                  alt={restaurantName}
+                  className="w-full h-full object-cover opacity-50"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white text-4xl opacity-50">
+                  🍽️
+                </div>
+              )}
               <button
                 onClick={onClose}
                 className="absolute top-4 right-4 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70"

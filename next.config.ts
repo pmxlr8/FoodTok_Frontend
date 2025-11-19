@@ -12,7 +12,17 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['images.unsplash.com'],
+    domains: ['images.unsplash.com', 'localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3-media*.fl.yelpcdn.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.yelpcdn.com',
+      },
+    ],
   },
   // Disable experimental features that might cause issues
   experimental: {

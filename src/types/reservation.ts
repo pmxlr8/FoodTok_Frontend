@@ -64,6 +64,9 @@ export interface PaymentMethod {
   last4?: string;           // Last 4 digits of card
   cardBrand?: string;       // "Visa", "Mastercard", etc.
   upiId?: string;           // For UPI payments
+  cardholderName?: string;  // Name on card
+  expiryMonth?: string;     // Expiry month
+  expiryYear?: string;      // Expiry year
 }
 
 // Restaurant with Reservation Capability

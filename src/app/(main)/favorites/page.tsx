@@ -1,6 +1,6 @@
 /**
  * Favorites Page
- * Display user's liked restaurants
+ * Display user's liked restaurants from DynamoDB backend
  */
 
 'use client';
@@ -10,47 +10,64 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useAuthStore, useDiscoveryStore } from '@/lib/stores';
-import { Restaurant } from '@/types';
-import { getRestaurantById } from '@/lib/api';
-import { Star, MapPin, Heart, ArrowRight } from 'lucide-react';
-import { formatCurrency, capitalizeWords } from '@/lib/utils';
-import Image from 'next/image';
+import { useAuthStore } from '@/lib/stores';
+import { getUserFavorites, removeFavorite } from '@/lib/api';
+import type { Favorite } from '@/lib/api/favorites';
+import { Star, Heart, ArrowRight } from 'lucide-react';
 
 export default function FavoritesPage() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { likedRestaurants } = useDiscoveryStore();
   
-  const [favoriteRestaurants, setFavoriteRestaurants] = useState<Restaurant[]>([]);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFavorites = async () => {
-      if (!user || likedRestaurants.length === 0) {
+      console.log('🔍 Favorites page: Checking user state...', user);
+      
+      if (!user) {
+        console.warn('⚠️ No user found in auth store');
         setIsLoading(false);
         return;
       }
 
+      console.log('👤 User found:', user.email, 'ID:', user.id);
       setIsLoading(true);
       try {
-        const restaurants = await Promise.all(
-          likedRestaurants.map(async (id) => {
-            const response = await getRestaurantById(id);
-            return response;
-          })
-        );
-
-        setFavoriteRestaurants(restaurants as any);
+        console.log('📡 Fetching favorites for user:', user.id);
+        const userFavorites = await getUserFavorites(user.id);
+        console.log('📋 Loaded', userFavorites.length, 'favorites from backend');
+        setFavorites(userFavorites);
       } catch (error) {
-        console.error('Failed to fetch favorite restaurants:', error);
+        console.error('❌ Failed to fetch favorites:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchFavorites();
-  }, [user, likedRestaurants]);
+  }, [user]);
+
+  const handleRemoveFavorite = async (restaurantId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user || removingId) return;
+
+    setRemovingId(restaurantId);
+    try {
+      await removeFavorite(user.id, restaurantId);
+      console.log('✅ Removed favorite:', restaurantId);
+      
+      // Update local state
+      setFavorites(prev => prev.filter(f => f.restaurantId !== restaurantId));
+    } catch (error) {
+      console.error('Failed to remove favorite:', error);
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -60,7 +77,7 @@ export default function FavoritesPage() {
     );
   }
 
-  if (favoriteRestaurants.length === 0) {
+  if (favorites.length === 0) {
     return (
       <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
         <div className="text-center space-y-6 max-w-md mx-auto">
@@ -87,88 +104,78 @@ export default function FavoritesPage() {
           <div>
             <h1 className="text-2xl font-bold">Your Favorites</h1>
             <p className="text-muted-foreground">
-              {favoriteRestaurants.length} restaurant{favoriteRestaurants.length !== 1 ? 's' : ''}
+              {favorites.length} restaurant{favorites.length !== 1 ? 's' : ''}
             </p>
           </div>
           <Heart className="h-6 w-6 text-destructive fill-current" />
         </div>
 
         <div className="grid gap-4">
-          {favoriteRestaurants.map((restaurant, index) => (
+          {favorites.map((favorite, index) => (
             <motion.div
-              key={`fav-${restaurant.id}-${index}`}
+              key={`fav-${favorite.restaurantId}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card 
-                className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/restaurant/${restaurant.id}`)}
-              >
+              <Card className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-0">
-                  <div className="flex">
+                  <div 
+                    className="flex cursor-pointer"
+                    onClick={() => router.push(`/restaurant/${favorite.restaurantId}`)}
+                  >
                     {/* Restaurant Image */}
-                    <div className="relative w-24 h-24 flex-shrink-0">
-                      <Image
-                        src={restaurant.images[0]}
-                        alt={restaurant.name}
-                        fill
-                        className="object-cover"
-                        sizes="96px"
-                      />
+                    <div className="w-24 h-24 flex-shrink-0 bg-muted overflow-hidden rounded-l-lg">
+                      {favorite.restaurantImage ? (
+                        <img
+                          src={favorite.restaurantImage}
+                          alt={favorite.restaurantName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-2xl">
+                          🍽️
+                        </div>
+                      )}
                     </div>
                     
                     {/* Restaurant Info */}
                     <div className="flex-1 p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-lg truncate">{restaurant.name}</h3>
+                        <h3 className="font-semibold text-lg truncate">
+                          {favorite.restaurantName}
+                        </h3>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive flex-shrink-0"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0 relative z-10"
+                          onClick={(e) => handleRemoveFavorite(favorite.restaurantId, e)}
+                          disabled={removingId === favorite.restaurantId}
+                          title="Remove from favorites"
                         >
-                          <Heart className="h-4 w-4 fill-current" />
+                          {removingId === favorite.restaurantId ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-destructive" />
+                          ) : (
+                            <Heart className="h-4 w-4 fill-current" />
+                          )}
                         </Button>
                       </div>
                       
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-medium">{restaurant.rating}</span>
-                          <span className="text-sm text-muted-foreground">
-                            ({restaurant.reviewCount})
-                          </span>
+                          <span className="text-sm font-medium">{favorite.matchScore}%</span>
+                          <span className="text-sm text-muted-foreground">match</span>
                         </div>
-                        <span className="text-muted-foreground">•</span>
-                        <span className="text-sm font-medium">{restaurant.priceRange}</span>
                       </div>
 
-                      <p className="text-sm text-muted-foreground mb-2 line-clamp-1">
-                        {restaurant.description}
+                      <p className="text-sm text-muted-foreground">
+                        Liked {new Date(favorite.likedAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
                       </p>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap gap-1">
-                          {restaurant.cuisine.slice(0, 2).map((cuisine) => (
-                            <span
-                              key={cuisine}
-                              className="px-2 py-0.5 bg-secondary text-secondary-foreground text-xs rounded"
-                            >
-                              {capitalizeWords(cuisine)}
-                            </span>
-                          ))}
-                          {restaurant.cuisine.length > 2 && (
-                            <span className="px-2 py-0.5 bg-secondary text-secondary-foreground text-xs rounded">
-                              +{restaurant.cuisine.length - 2} more
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span>{restaurant.location.city}</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </CardContent>

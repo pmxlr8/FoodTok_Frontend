@@ -15,6 +15,15 @@ export default function HoldTimer({ hold, onExpired }: HoldTimerProps) {
 
   useEffect(() => {
     const calculateTimeLeft = () => {
+      // Handle missing or invalid expiresAt
+      if (!hold.expiresAt || isNaN(hold.expiresAt)) {
+        console.warn('⚠️ Invalid expiresAt timestamp:', hold.expiresAt);
+        // Default to 10 minutes from now
+        const fallbackExpiry = Date.now() + (10 * 60 * 1000);
+        setTimeLeft(fallbackExpiry - Date.now());
+        return;
+      }
+
       const remaining = Math.max(0, hold.expiresAt - Date.now());
       setTimeLeft(remaining);
       
@@ -32,7 +41,7 @@ export default function HoldTimer({ hold, onExpired }: HoldTimerProps) {
   const totalSeconds = Math.floor(timeLeft / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  const percentage = (timeLeft / (10 * 60 * 1000)) * 100;
+  const percentage = Math.min(100, Math.max(0, (timeLeft / (10 * 60 * 1000)) * 100));
 
   const isUrgent = minutes < 2;
   const isCritical = minutes < 1;

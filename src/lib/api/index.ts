@@ -1,69 +1,85 @@
 /**
  * FoodTok API Client
  * 
- * Central API entry point - Switch between mock and real backend here
+ * Central API entry point - Switch between mock, Yelp, and backend APIs
  * 
- * DEVELOPMENT MODE (Current):
- * - Uses mock-*.ts files with simulated data
- * - Includes network delays and race condition handling
- * - Perfect for frontend development
+ * DATA SOURCES:
+ * - MOCK: Simulated data for development
+ * - YELP: Real restaurant data from Yelp Fusion API
+ * - BACKEND: Custom Django backend (when ready)
  * 
- * PRODUCTION MODE (When backend ready):
- * - Uncomment the real API imports
- * - Set NEXT_PUBLIC_API_URL in .env.local
- * - All components will automatically use real backend
+ * Set NEXT_PUBLIC_RESTAURANT_SOURCE in .env.local:
+ * - 'mock' - Use mock data
+ * - 'yelp' - Use Yelp API (default)
+ * - 'backend' - Use Django backend
  */
 
 // ============================================================================
-// CURRENT: MOCK APIs (Development)
+// API IMPLEMENTATION IMPORTS
 // ============================================================================
 import * as MockReservations from './mock-reservations';
 import * as MockRestaurants from './mock-restaurants';
-import * as Auth from './auth';
+import * as MockAuth from './mock-auth';
 
-// Re-export auth APIs
-export const loginUser = Auth.loginUser;
-export const signupUser = Auth.signupUser;
-export const updateUserPreferences = Auth.updateUserPreferences;
-export const getUserProfile = Auth.getUserProfile;
-
-// Re-export reservation APIs
-export const checkAvailability = MockReservations.checkAvailability;
-export const createHold = MockReservations.createHold;
-export const getUserActiveHold = MockReservations.getUserActiveHold;
-export const confirmReservation = MockReservations.confirmReservation;
-export const getUserReservations = MockReservations.getUserReservations;
-export const getReservationById = MockReservations.getReservationById;
-export const modifyReservation = MockReservations.modifyReservation;
-export const cancelReservation = MockReservations.cancelReservation;
-
-// Re-export restaurant APIs
-export const getDiscoveryRestaurants = MockRestaurants.getDiscoveryRestaurants;
-export const getRestaurantById = MockRestaurants.getRestaurantById;
-export const searchRestaurants = MockRestaurants.searchRestaurants;
+// Real API implementations
+import * as RealReservations from './reservations';
+import * as RealRestaurants from './restaurants';
+import * as RealAuth from './auth';
 
 // ============================================================================
-// FUTURE: REAL APIs (Production)
+// DATA SOURCE CONFIGURATION
 // ============================================================================
-// When backend is ready, uncomment these and comment out the mock imports above:
-/*
-export {
-  checkAvailability,
-  createHold,
-  getUserActiveHold,
-  confirmReservation,
-  getUserReservations,
-  getReservationById,
-  modifyReservation,
-  cancelReservation,
-} from './reservations';
+const restaurantSource = process.env.NEXT_PUBLIC_RESTAURANT_SOURCE || 'yelp';
+const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false';
 
-export {
-  getDiscoveryRestaurants,
-  getRestaurantById,
-  searchRestaurants,
-} from './restaurants';
-*/
+// Determine which API implementations to use
+const useYelpRestaurants = restaurantSource === 'yelp';
+const useMockRestaurants = restaurantSource === 'mock';
+const useBackendRestaurants = restaurantSource === 'backend';
+
+// Auth and reservations use mock by default, real when USE_MOCKS=false
+const useMocksForAuth = useMocks;
+const useMocksForReservations = useMocks;
+
+// ============================================================================
+// EXPORTED API FUNCTIONS
+// ============================================================================
+
+// Auth (mock or real backend with Cognito)
+export const loginUser = useMocksForAuth ? MockAuth.loginUser : RealAuth.loginUser;
+export const signupUser = useMocksForAuth ? MockAuth.signupUser : RealAuth.signupUser;
+export const updateUserPreferences = useMocksForAuth ? MockAuth.updateUserPreferences : RealAuth.updateUserPreferences;
+export const getUserProfile = useMocksForAuth ? MockAuth.getUserProfile : RealAuth.getUserProfile;
+
+// Reservations (mock or real backend)
+export const checkAvailability = useMocksForReservations ? MockReservations.checkAvailability : RealReservations.checkAvailability;
+export const createHold = useMocksForReservations ? MockReservations.createHold : RealReservations.createHold;
+export const getUserActiveHold = useMocksForReservations ? MockReservations.getUserActiveHold : RealReservations.getUserActiveHold;
+export const confirmReservation = useMocksForReservations ? MockReservations.confirmReservation : RealReservations.confirmReservation;
+export const getUserReservations = useMocksForReservations ? MockReservations.getUserReservations : RealReservations.getUserReservations;
+export const getReservationById = useMocksForReservations ? MockReservations.getReservationById : RealReservations.getReservationById;
+export const modifyReservation = useMocksForReservations ? MockReservations.modifyReservation : RealReservations.modifyReservation;
+export const cancelReservation = useMocksForReservations ? MockReservations.cancelReservation : RealReservations.cancelReservation;
+
+// Restaurants (mock, Yelp, or backend)
+export const getDiscoveryRestaurants = useMockRestaurants 
+  ? MockRestaurants.getDiscoveryRestaurants 
+  : RealRestaurants.getDiscoveryRestaurants;
+
+export const getRestaurantById = useMockRestaurants 
+  ? MockRestaurants.getRestaurantById 
+  : RealRestaurants.getRestaurantById;
+
+export const searchRestaurants = useMockRestaurants 
+  ? MockRestaurants.searchRestaurants 
+  : RealRestaurants.searchRestaurants;
+
+// Favorites (always use real backend)
+export { addFavorite, getUserFavorites, removeFavorite, checkFavorite } from './favorites';
+
+// Stats (always use real backend)
+export { getUserStats } from './stats';
+export type { UserStats } from './stats';
 
 // ============================================================================
 // API Configuration
@@ -109,12 +125,48 @@ export async function apiRequest<T = any>(
     };
   }
 
+  console.log('🚀 API Request:', {
+    url,
+    method: config.method,
+    headers: config.headers,
+    body: options.body
+  });
+
   const response = await fetch(url, config);
 
+  console.log('📥 API Response:', {
+    status: response.status,
+    statusText: response.statusText,
+    url: response.url
+  });
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'API request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const errorText = await response.text();
+    console.error('❌ API Error Response:', errorText);
+    
+    let errorData;
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { message: errorText || 'API request failed' };
+    }
+    
+    throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
   }
 
-  return response.json();
+  // Handle empty responses (like 204 No Content or empty 200)
+  const responseText = await response.text();
+  if (!responseText || responseText.trim() === '') {
+    console.log('✅ API Success: Empty response');
+    return {} as T;
+  }
+  
+  try {
+    const data = JSON.parse(responseText);
+    console.log('✅ API Success:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to parse JSON:', responseText);
+    throw new Error('Invalid JSON response from server');
+  }
 }

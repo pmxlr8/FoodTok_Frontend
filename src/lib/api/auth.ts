@@ -1,122 +1,123 @@
 /**
- * Authentication API stubs
- * TODO: Implement these when backend is ready
+ * Authentication API Client
+ * 
+ * Real implementation with backend authentication endpoints
+ * Note: Backend uses AWS Cognito for authentication
+ * 
+ * Endpoints:
+ * - POST /api/auth/login      - User login
+ * - POST /api/auth/signup     - User registration  
+ * - PATCH /api/auth/preferences - Update user preferences
+ * - GET /api/auth/profile/:id - Get user profile
  */
 
 import { User, UserPreferences } from '@/types';
+import { apiRequest } from './index';
 
-// Simulated delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; data?: User; error?: string }> {
-  await delay(500);
-  
-  // Mock login - accepts any email with password "password123"
-  if (password === 'password123') {
+/**
+ * Login user with email and password
+ * POST /api/auth/login
+ */
+export async function loginUser(
+  email: string, 
+  password: string
+): Promise<{ success: boolean; data?: User; error?: string }> {
+  try {
+    const response = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    
     return {
       success: true,
-      data: {
-        id: 'user_001',
-        email,
-        firstName: 'Demo',
-        lastName: 'User',
-        preferences: {
-          cuisines: [],
-          dietaryRestrictions: [],
-          priceRange: '$$' as const,
-          maxDistance: 10,
-          favoriteRestaurants: []
-        },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as User
+      data: response.user,
+    };
+  } catch (error: any) {
+    console.error('Login error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Login failed. Please try again.',
     };
   }
-  
-  return {
-    success: false,
-    error: 'Invalid credentials'
-  };
 }
 
-export async function signupUser(userData: any): Promise<{ success: boolean; data?: User; error?: string }> {
-  await delay(500);
-  
-  return {
-    success: true,
-    data: {
-      id: 'user_' + Date.now(),
-      ...userData,
-      preferences: {
-        cuisines: [],
-        dietaryRestrictions: [],
-        priceRange: '$$' as const,
-        maxDistance: 10,
-        favoriteRestaurants: []
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    } as User
-  };
-}
-
-export async function updateUserPreferences(userId: string, preferences: Partial<UserPreferences>): Promise<{ success: boolean; data?: User; error?: string }> {
-  await delay(300);
-  
-  // Get stored user from localStorage
-  const storedAuth = localStorage.getItem('foodtok-auth');
-  if (storedAuth) {
-    try {
-      const authState = JSON.parse(storedAuth);
-      const currentUser = authState.state?.user;
-      
-      if (currentUser && currentUser.id === userId) {
-        // Merge new preferences with existing ones
-        const updatedUser: User = {
-          ...currentUser,
-          preferences: {
-            ...currentUser.preferences,
-            ...preferences
-          },
-          updatedAt: new Date()
-        };
-        
-        return {
-          success: true,
-          data: updatedUser
-        };
-      }
-    } catch (error) {
-      console.error('Error parsing stored auth:', error);
-    }
+/**
+ * Register new user
+ * POST /api/auth/signup
+ */
+export async function signupUser(
+  userData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
   }
-  
-  // Fallback: return basic user with preferences
-  return {
-    success: true,
-    data: {
-      id: userId,
-      email: 'demo@example.com',
-      firstName: 'Demo',
-      lastName: 'User',
-      preferences: {
-        cuisines: preferences.cuisines || [],
-        dietaryRestrictions: preferences.dietaryRestrictions || [],
-        priceRange: preferences.priceRange || '$$',
-        maxDistance: preferences.maxDistance || 10,
-        favoriteRestaurants: []
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    } as User
-  };
+): Promise<{ success: boolean; data?: User; error?: string }> {
+  try {
+    const response = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+    
+    return {
+      success: true,
+      data: response.user,
+    };
+  } catch (error: any) {
+    console.error('Signup error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Signup failed. Please try again.',
+    };
+  }
 }
 
-export async function getUserProfile(userId: string): Promise<{ success: boolean; data?: User; error?: string }> {
-  await delay(300);
-  
-  return {
-    success: true,
-    data: {} as User
-  };
+/**
+ * Update user preferences
+ * PATCH /api/auth/preferences
+ */
+export async function updateUserPreferences(
+  userId: string,
+  preferences: Partial<UserPreferences>
+): Promise<{ success: boolean; data?: User; error?: string }> {
+  try {
+    const response = await apiRequest(`/auth/preferences`, {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, preferences }),
+    });
+    
+    return {
+      success: true,
+      data: response.user,
+    };
+  } catch (error: any) {
+    console.error('Update preferences error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Failed to update preferences.',
+    };
+  }
+}
+
+/**
+ * Get user profile
+ * GET /api/auth/profile/:userId
+ */
+export async function getUserProfile(
+  userId: string
+): Promise<{ success: boolean; data?: User; error?: string }> {
+  try {
+    const response = await apiRequest(`/auth/profile/${userId}`);
+    
+    return {
+      success: true,
+      data: response.user,
+    };
+  } catch (error: any) {
+    console.error('Get profile error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Failed to fetch profile.',
+    };
+  }
 }

@@ -23,11 +23,9 @@ import {
   Calendar
 } from 'lucide-react';
 import { Restaurant, MenuItem } from '@/types';
-import { getRestaurantById } from '@/lib/api';
-import { useCartStore, useAuthStore } from '@/lib/stores';
-import { formatCurrency, capitalizeWords } from '@/lib/utils';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { getRestaurantById, getDiscoveryRestaurants } from '@/lib/api';
+import { useCartStore, useAuthStore, useReservationStore } from '@/lib/stores';
+import { formatCurrency, capitalizeWords, cn } from '@/lib/utils';
 import ReservationModal from '@/components/reservation/ReservationModal';
 import type { Hold } from '@/types/reservation';
 
@@ -44,17 +42,13 @@ export default function RestaurantDetailsPage() {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [reservationModalOpen, setReservationModalOpen] = useState(false);
 
-  async function getRestaurants() {
+  async function fetchDiscoverySample() {
     try {
-      const res = await fetch("http://localhost:8080/api/restaurants");
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const data = await res.json();
-      console.log(data);
+      // Example: fetch 3 discovery cards for quick dev testing
+      const data = await getDiscoveryRestaurants('user_001', 3);
+      console.log('Discovery sample:', data);
     } catch (err) {
-      console.error("Failed to fetch restaurants:", err);
+      console.error('Failed to fetch discovery sample:', err);
     }
   }
 
@@ -97,8 +91,38 @@ export default function RestaurantDetailsPage() {
     }));
   };
 
-  const handleHoldCreated = (hold: Hold) => {
-    // Redirect to checkout page with hold
+  const handleHoldCreated = (holdData: any) => {
+    console.log('✅ Hold created - converting and storing in zustand');
+    console.log('🔍 Backend hold data:', holdData);
+    
+    // Backend expiresAt is broken - it gives a future date instead of NOW + 10min
+    // Calculate correct expiry: NOW + 10 minutes
+    const correctExpiresAt = Date.now() + (10 * 60 * 1000);
+    
+    // Convert backend format to frontend Hold type immediately
+    const hold: Hold = {
+      holdId: holdData.hold.holdId,
+      userId: holdData.hold.userId,
+      restaurantId: holdData.hold.restaurantId,
+      restaurantName: holdData.restaurantName || restaurant?.name || 'Restaurant',
+      restaurantImage: holdData.restaurantImage || (restaurant?.images?.[0]) || '',
+      date: holdData.hold.date,
+      time: holdData.hold.time,
+      partySize: holdData.hold.partySize,
+      status: 'held',
+      depositAmount: holdData.totalDeposit || 50,
+      createdAt: Date.now(),
+      expiresAt: correctExpiresAt
+    };
+    
+    console.log('✅ Converted hold with CORRECT expiresAt:', hold);
+    console.log('✅ Timer will expire at:', new Date(hold.expiresAt).toISOString());
+    console.log('✅ Minutes from now:', Math.floor((hold.expiresAt - Date.now()) / 60000));
+    
+    // Store in zustand global state
+    useReservationStore.getState().setActiveHold(hold);
+    
+    // Navigate to checkout
     router.push('/checkout');
   };
 
@@ -130,15 +154,23 @@ export default function RestaurantDetailsPage() {
   return (
     <div className="min-h-screen pb-20">
       {/* Header Image */}
-      <div className="relative h-64 overflow-hidden">
-        <Image
-          src={restaurant.images[0]}
-          alt={restaurant.name}
-          fill
-          className="object-cover"
-          sizes="100vw"
-          priority
-        />
+      <div className="relative h-64 overflow-hidden bg-muted">
+        {restaurant.images && restaurant.images.length > 0 && restaurant.images[0] ? (
+          <img
+            src={restaurant.images[0]}
+            alt={restaurant.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              console.error('❌ Image failed to load:', restaurant.images[0]);
+              e.currentTarget.style.display = 'none';
+            }}
+            onLoad={() => console.log('✅ Image loaded:', restaurant.images[0])}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-6xl">
+            🍽️
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         
         {/* Back Button */}
@@ -152,14 +184,14 @@ export default function RestaurantDetailsPage() {
         </Button>
 
         {/* Favorite Button */}
-        <Button
-          variant="secondary"
-          size="icon"
-          className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm"
-          onClick={() => getRestaurants()}
-        >
-          <Heart className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm"
+            onClick={() => fetchDiscoverySample()}
+          >
+            <Heart className="h-4 w-4" />
+          </Button>
 
         {/* Restaurant Name Overlay */}
         <div className="absolute bottom-4 left-4 text-white">
@@ -246,6 +278,18 @@ export default function RestaurantDetailsPage() {
 
         {/* Menu Items */}
         <div className="space-y-4">
+          {filteredMenu.length === 0 && selectedCategory === 'all' && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground mb-4">
+                  Menu information is not available from Yelp.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Please visit the restaurant or call them for menu details.
+                </p>
+              </CardContent>
+            </Card>
+          )}
           {filteredMenu.map((item) => {
             const quantity = itemQuantities[item.id] || 1;
             return (
@@ -260,13 +304,11 @@ export default function RestaurantDetailsPage() {
                     <div className="flex gap-4">
                       {/* Item Image */}
                       {item.image && (
-                        <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                          <Image
+                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                          <img
                             src={item.image}
                             alt={item.name}
-                            fill
-                            className="object-cover"
-                            sizes="80px"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                       )}
@@ -372,7 +414,7 @@ export default function RestaurantDetailsPage() {
         onClose={() => setReservationModalOpen(false)}
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
-        restaurantImage={restaurant.images[0]}
+        restaurantImage={restaurant.images && restaurant.images.length > 0 ? restaurant.images[0] : ''}
         onHoldCreated={handleHoldCreated}
       />
     </div>

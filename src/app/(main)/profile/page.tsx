@@ -5,12 +5,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore, useAppStore } from '@/lib/stores';
+import { getUserStats } from '@/lib/api';
 import { 
   User, 
   Settings, 
@@ -29,6 +30,48 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { addNotification } = useAppStore();
+  
+  const [stats, setStats] = useState({
+    totalLikes: 0,
+    totalReservations: 0,
+    accountAge: 0,
+    loading: true
+  });
+
+  // Fetch real stats from API
+  useEffect(() => {
+    if (user?.id) {
+      getUserStats(user.id)
+        .then(data => {
+          setStats({
+            totalLikes: data.totalLikes,
+            totalReservations: data.totalReservations,
+            accountAge: data.accountAge,
+            loading: false
+          });
+        })
+        .catch(err => {
+          console.error('Failed to load stats:', err);
+          setStats(prev => ({ ...prev, loading: false }));
+        });
+    }
+  }, [user?.id]);
+  //   if (user?.id) {
+  //     fetch(`/api/stats/${user.id}`)
+  //       .then(res => res.json())
+  //       .then(data => setStats({ ...data, loading: false }))
+  //       .catch(err => {
+  //         console.error('Failed to load stats:', err);
+  //         setStats(prev => ({ ...prev, loading: false }));
+  //       });
+  //   }
+  // }, [user?.id]);
+
+  const statsDisplay = [
+    { label: 'Restaurants Liked', value: stats.totalLikes.toString(), icon: Heart },
+    { label: 'Total Reservations', value: stats.totalReservations.toString(), icon: Utensils },
+    { label: 'Days Active', value: stats.accountAge.toString(), icon: Clock },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -47,12 +90,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const stats = [
-    { label: 'Restaurants Liked', value: '12', icon: Heart },
-    { label: 'Total Reservations', value: '5', icon: Utensils },
-    { label: 'Days Active', value: '14', icon: Clock },
-  ];
 
   return (
     <div className="min-h-screen pb-20">
@@ -91,7 +128,7 @@ export default function ProfilePage() {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          {stats.map((stat, index) => (
+          {statsDisplay.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
@@ -101,7 +138,9 @@ export default function ProfilePage() {
               <Card>
                 <CardContent className="p-4 text-center">
                   <stat.icon className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <div className="text-2xl font-bold">
+                    {stats.loading ? '...' : stat.value}
+                  </div>
                   <div className="text-xs text-muted-foreground">{stat.label}</div>
                 </CardContent>
               </Card>
@@ -121,8 +160,8 @@ export default function ProfilePage() {
             <div>
               <h4 className="font-medium mb-2">Favorite Cuisines</h4>
               <div className="flex flex-wrap gap-2">
-                {user.preferences.cuisines.length > 0 ? (
-                  user.preferences.cuisines.map((cuisine) => (
+                {user.preferences?.cuisineTypes && user.preferences.cuisineTypes.length > 0 ? (
+                  user.preferences.cuisineTypes.map((cuisine) => (
                     <span
                       key={cuisine}
                       className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full"
@@ -136,7 +175,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {user.preferences.dietaryRestrictions.length > 0 && (
+            {user.preferences?.dietaryRestrictions && user.preferences.dietaryRestrictions.length > 0 && (
               <div>
                 <h4 className="font-medium mb-2">Dietary Restrictions</h4>
                 <div className="flex flex-wrap gap-2">
@@ -158,7 +197,7 @@ export default function ProfilePage() {
                   <DollarSign className="h-4 w-4" />
                   Budget
                 </h4>
-                <p className="text-muted-foreground">{user.preferences.priceRange}</p>
+                <p className="text-muted-foreground">{user.preferences?.priceRange || '$$'}</p>
               </div>
               
               <div>
@@ -166,7 +205,7 @@ export default function ProfilePage() {
                   <MapPin className="h-4 w-4" />
                   Max Distance
                 </h4>
-                <p className="text-muted-foreground">{user.preferences.maxDistance} miles</p>
+                <p className="text-muted-foreground">{user.preferences?.maxDistance || 10} miles</p>
               </div>
             </div>
 
@@ -212,36 +251,17 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
+        {/* Recent Activity - Coming Soon */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                <Heart className="h-4 w-4 text-destructive fill-current" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Liked Sakura Sushi</p>
-                  <p className="text-xs text-muted-foreground">2 hours ago</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                <Utensils className="h-4 w-4 text-primary" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Ordered from Mama's Trattoria</p>
-                  <p className="text-xs text-muted-foreground">Yesterday</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Updated food preferences</p>
-                  <p className="text-xs text-muted-foreground">3 days ago</p>
-                </div>
-              </div>
+            <div className="text-center py-8">
+              <Clock className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+              <p className="text-sm text-muted-foreground">
+                Activity tracking coming soon
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -10,10 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { MapPin, Calendar, Clock, Users, CreditCard, Check, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import HoldTimer from '@/components/reservation/HoldTimer';
 import { confirmReservation, getUserActiveHold } from '@/lib/api';
+import { useReservationStore } from '@/lib/stores';
 import type { Hold, Reservation } from '@/types/reservation';
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const clearHold = useReservationStore((state) => state.clearHold);
+  
   const [hold, setHold] = useState<Hold | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -29,17 +32,34 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     loadActiveHold();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadActiveHold = async () => {
     try {
-      const activeHold = await getUserActiveHold('current_user');
-      if (!activeHold) {
+      console.log('🔍 Checking for hold in zustand store...');
+      const currentHold = useReservationStore.getState().activeHold;
+      
+      if (currentHold) {
+        console.log('✅ Found hold in store:', currentHold);
+        console.log('✅ expiresAt:', currentHold.expiresAt, new Date(currentHold.expiresAt).toISOString());
+        setHold(currentHold);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('⚠️ No hold in store, trying backend...');
+      // Fallback to backend (shouldn't happen normally)
+      const backendHold = await getUserActiveHold('current_user');
+      if (!backendHold) {
+        console.error('❌ No active hold found anywhere');
         router.push('/');
         return;
       }
-      setHold(activeHold);
+      
+      setHold(backendHold);
     } catch (err: any) {
+      console.error('❌ Error loading hold:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -47,6 +67,8 @@ export default function CheckoutPage() {
   };
 
   const handleExpired = () => {
+    console.log('⏰ Hold expired, clearing and redirecting');
+    clearHold();
     router.push('/');
   };
 
@@ -64,23 +86,72 @@ export default function CheckoutPage() {
     return cleaned;
   };
 
+  const validateCardNumber = (num: string): boolean => {
+    // Luhn algorithm for card validation
+    const cleaned = num.replace(/\s/g, '');
+    if (!/^\d{16}$/.test(cleaned)) return false;
+    
+    let sum = 0;
+    let isEven = false;
+    
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      let digit = parseInt(cleaned[i]);
+      
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      
+      sum += digit;
+      isEven = !isEven;
+    }
+    
+    return sum % 10 === 0;
+  };
+
+  const validateExpiry = (exp: string): boolean => {
+    if (exp.length !== 5) return false;
+    
+    const [month, year] = exp.split('/').map(Number);
+    if (!month || !year) return false;
+    if (month < 1 || month > 12) return false;
+    
+    // Check if card is expired
+    const now = new Date();
+    const currentYear = now.getFullYear() % 100; // Last 2 digits
+    const currentMonth = now.getMonth() + 1;
+    
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+    
+    return true;
+  };
+
   const validatePayment = (): boolean => {
-    if (cardNumber.replace(/\s/g, '').length !== 16) {
-      setError('Invalid card number');
+    // Validate card number with Luhn algorithm
+    if (!validateCardNumber(cardNumber)) {
+      setError('Invalid card number. Please check and try again.');
       return false;
     }
-    if (expiry.length !== 5) {
-      setError('Invalid expiry date');
+    
+    // Validate expiry date
+    if (!validateExpiry(expiry)) {
+      setError('Card has expired or expiry date is invalid.');
       return false;
     }
-    if (cvv.length !== 3) {
-      setError('Invalid CVV');
+    
+    // Validate CVV
+    if (!/^\d{3,4}$/.test(cvv)) {
+      setError('Invalid CVV. Must be 3 or 4 digits.');
       return false;
     }
-    if (!name.trim()) {
-      setError('Name is required');
+    
+    // Validate name
+    if (!name.trim() || name.trim().length < 3) {
+      setError('Please enter the cardholder name.');
       return false;
     }
+    
     return true;
   };
 
@@ -96,19 +167,46 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     try {
+      console.log('💳 Processing payment for reservation...');
+      console.log('💰 Deposit amount:', hold.depositAmount);
+      
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       const result = await confirmReservation({
         holdId: hold.holdId,
         userId: 'current_user',
         paymentMethod: {
           type: 'credit-card',
           last4: cardNumber.replace(/\s/g, '').slice(-4),
+          cardholderName: name,
+          expiryMonth: expiry.split('/')[0],
+          expiryYear: '20' + expiry.split('/')[1],
         },
         specialRequests: specialRequests || undefined,
       });
 
-      setReservation(result.reservation);
+      console.log('✅ Reservation confirmed:', result.reservation);
+      
+      // Backend doesn't return date/time, use them from hold
+      const completeReservation = {
+        ...result.reservation,
+        date: result.reservation.date || hold.date,
+        time: result.reservation.time || hold.time,
+        partySize: result.reservation.partySize || hold.partySize,
+        depositAmount: result.reservation.depositAmount || hold.depositAmount,
+        restaurantName: result.reservation.restaurantName || hold.restaurantName,
+        restaurantId: result.reservation.restaurantId || hold.restaurantId,
+      };
+      
+      console.log('✅ Complete reservation with hold data:', completeReservation);
+      setReservation(completeReservation as any);
+      
+      // Clear the hold from store
+      clearHold();
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ Payment processing failed:', err);
+      setError(err.message || 'Payment failed. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -173,12 +271,40 @@ export default function CheckoutPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Date</p>
                     <p className="font-semibold">
-                      {new Date(reservation.date).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                      {(() => {
+                        try {
+                          if (!reservation.date) {
+                            console.error('❌ No reservation.date field:', reservation);
+                            return 'Date not available';
+                          }
+                          // reservation.date could be "2025-12-13" or a timestamp
+                          const dateStr = String(reservation.date);
+                          console.log('📅 Parsing date:', dateStr);
+                          
+                          // Try parsing as ISO date first
+                          let dateObj = new Date(dateStr);
+                          
+                          // If invalid, try appending time
+                          if (isNaN(dateObj.getTime())) {
+                            dateObj = new Date(dateStr + 'T00:00:00');
+                          }
+                          
+                          if (isNaN(dateObj.getTime())) {
+                            console.error('❌ Could not parse date:', dateStr);
+                            return dateStr;
+                          }
+                          
+                          return dateObj.toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                        } catch (e) {
+                          console.error('❌ Date parse error:', e, reservation.date);
+                          return reservation.date ? String(reservation.date) : 'Date not available';
+                        }
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -224,8 +350,12 @@ export default function CheckoutPage() {
     );
   }
 
-  const depositPerPerson = 25;
-  const totalDeposit = depositPerPerson * hold.partySize;
+  const depositPerPerson = hold?.depositAmount ? (hold.depositAmount / (hold.partySize || 1)) : 25;
+  const totalDeposit = hold?.depositAmount || (depositPerPerson * (hold?.partySize || 1));
+  const partySize = hold?.partySize || 0;
+  const holdDate = hold?.date ? new Date(hold.date) : new Date();
+  const holdTime = hold?.time || '';
+  const restaurantName = hold?.restaurantName || 'Restaurant';
 
   return (
     <div className="min-h-screen pb-20">
@@ -270,7 +400,7 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Restaurant</p>
-                    <p className="font-semibold text-lg">{hold.restaurantName}</p>
+                    <p className="font-semibold text-lg">{restaurantName}</p>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -278,7 +408,7 @@ export default function CheckoutPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Date</p>
                       <p className="font-medium">
-                        {new Date(hold.date).toLocaleDateString('en-US', {
+                        {holdDate.toLocaleDateString('en-US', {
                           weekday: 'long',
                           year: 'numeric',
                           month: 'long',
@@ -292,7 +422,7 @@ export default function CheckoutPage() {
                     <Clock className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Time</p>
-                      <p className="font-medium">{hold.time}</p>
+                      <p className="font-medium">{holdTime || 'Not selected'}</p>
                     </div>
                   </div>
 
@@ -300,7 +430,7 @@ export default function CheckoutPage() {
                     <Users className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Party Size</p>
-                      <p className="font-medium">{hold.partySize} guests</p>
+                      <p className="font-medium">{partySize} guests</p>
                     </div>
                   </div>
                 </div>
@@ -308,7 +438,7 @@ export default function CheckoutPage() {
                 <div className="mt-6 pt-6 border-t">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Deposit (${depositPerPerson} × {hold.partySize})</span>
+                      <span className="text-muted-foreground">Deposit (${depositPerPerson.toFixed(2)} × {partySize})</span>
                       <span className="font-medium">${totalDeposit.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold">

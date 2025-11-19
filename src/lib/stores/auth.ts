@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { User, UserPreferences } from '@/types';
 import { loginUser, signupUser, updateUserPreferences, getUserProfile } from '@/lib/api';
 
@@ -45,17 +45,21 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         
         try {
+          console.log('🔑 Attempting login for:', email);
           const response = await loginUser(email, password);
           
           if (response.success && response.data) {
+            console.log('✅ Login successful, saving user:', response.data);
             set({
               user: response.data,
               isAuthenticated: true,
               isLoading: false,
               error: null
             });
+            console.log('💾 Auth state saved to store');
             return true;
           } else {
+            console.error('❌ Login failed:', response.error);
             set({
               error: response.error || 'Login failed',
               isLoading: false
@@ -63,6 +67,7 @@ export const useAuthStore = create<AuthStore>()(
             return false;
           }
         } catch (error) {
+          console.error('❌ Login network error:', error);
           set({
             error: 'Network error. Please try again.',
             isLoading: false
@@ -161,10 +166,21 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'foodtok-auth',
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated
-      })
+      }),
+      onRehydrateStorage: () => {
+        console.log('🔄 Auth store: Starting to hydrate from localStorage...');
+        return (state, error) => {
+          if (error) {
+            console.error('❌ Auth store hydration failed:', error);
+          } else {
+            console.log('✅ Auth store hydrated:', state?.user ? `User: ${state.user.email}` : 'No user');
+          }
+        };
+      }
     }
   )
 );

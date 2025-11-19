@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user, logout, updatePreferences } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editedUser, setEditedUser] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -34,9 +35,41 @@ export default function SettingsPage() {
   });
 
   const handleSaveProfile = async () => {
-    // In a real app, this would update user profile via API
-    console.log('Updating profile:', editedUser);
-    setIsEditing(false);
+    if (!user) return;
+    
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/auth/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          firstName: editedUser.firstName,
+          lastName: editedUser.lastName
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to save profile');
+
+      const data = await response.json();
+      
+      // Update local auth store
+      useAuthStore.setState((state) => ({
+        user: state.user ? { 
+          ...state.user, 
+          firstName: editedUser.firstName,
+          lastName: editedUser.lastName 
+        } : null
+      }));
+      
+      setIsEditing(false);
+      console.log('✅ Profile updated successfully');
+    } catch (error) {
+      console.error('❌ Failed to save profile:', error);
+      alert('Failed to save profile changes. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -170,13 +203,18 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button onClick={handleSaveProfile} className="flex-1">
+                  <Button 
+                    onClick={handleSaveProfile} 
+                    disabled={isSaving}
+                    className="flex-1"
+                  >
                     <Save className="h-4 w-4 mr-2" />
-                    Save Changes
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => setIsEditing(false)}
+                    disabled={isSaving}
                     className="flex-1"
                   >
                     Cancel
@@ -214,20 +252,24 @@ export default function SettingsPage() {
               <div>
                 <h4 className="font-medium mb-2">Favorite Cuisines</h4>
                 <div className="flex flex-wrap gap-2">
-                  {user.preferences?.cuisines.map((cuisine) => (
-                    <span
-                      key={cuisine}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      {cuisine.charAt(0).toUpperCase() + cuisine.slice(1)}
-                    </span>
-                  ))}
+                  {user.preferences?.cuisineTypes && user.preferences.cuisineTypes.length > 0 ? (
+                    user.preferences.cuisineTypes.map((cuisine) => (
+                      <span
+                        key={cuisine}
+                        className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                      >
+                        {cuisine.charAt(0).toUpperCase() + cuisine.slice(1)}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No cuisines selected</span>
+                  )}
                 </div>
               </div>
               <div>
                 <h4 className="font-medium mb-2">Price Range</h4>
                 <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
-                  {user.preferences?.priceRange}
+                  {user.preferences?.priceRange || 'Not set'}
                 </span>
               </div>
               <Button 

@@ -16,10 +16,15 @@ export interface User {
 }
 
 export interface UserPreferences {
-  cuisines: Cuisine[];
+  cuisineTypes: Cuisine[]; // Changed from 'cuisines' to match backend
   dietaryRestrictions: DietaryRestriction[];
   priceRange: PriceRange;
   maxDistance: number; // in miles
+  location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  };
   favoriteRestaurants: string[]; // restaurant IDs
 }
 
@@ -272,10 +277,15 @@ export interface SignupForm {
 }
 
 export interface OnboardingForm {
-  cuisines: Cuisine[];
+  cuisineTypes: Cuisine[];
   dietaryRestrictions: DietaryRestriction[];
   priceRange: PriceRange;
   maxDistance: number;
+  location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  };
 }
 
 // Utility types

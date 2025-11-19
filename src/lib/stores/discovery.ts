@@ -18,7 +18,7 @@ interface DiscoveryState {
 }
 
 interface DiscoveryActions {
-  loadQueue: (userId?: string) => Promise<void>;
+  loadQueue: (userId?: string, preferences?: any) => Promise<void>;
   swipeCard: (direction: 'left' | 'right', restaurantId: string) => void;
   resetQueue: () => void;
   undoSwipe: () => void;
@@ -40,11 +40,24 @@ export const useDiscoveryStore = create<DiscoveryStore>((set, get) => ({
   passedRestaurants: [],
 
   // Actions
-  loadQueue: async (userId?: string) => {
+  loadQueue: async (userId?: string, preferences?: any) => {
     set({ isLoading: true, error: null });
     
     try {
-      const response = await getDiscoveryRestaurants(userId || 'default', 10);
+      console.log('🔄 Loading discovery queue with preferences:', preferences);
+      console.log('📍 User location:', preferences?.location);
+      console.log('🍽️ User cuisines:', preferences?.cuisineTypes);
+      console.log('💰 User price range:', preferences?.priceRange);
+      
+      const response = await getDiscoveryRestaurants(
+        userId || 'default',
+        20, // Increased from 10 to 20 for more variety
+        preferences
+      );
+      
+      console.log('✅ Received', response.length, 'restaurants from Yelp');
+      console.log('🎯 First restaurant:', response[0]?.restaurant?.name);
+      console.log('📊 Match scores:', response.slice(0, 5).map(c => ({ name: c.restaurant.name, score: c.matchScore })));
       
       set({
         queue: response as any,
@@ -53,6 +66,7 @@ export const useDiscoveryStore = create<DiscoveryStore>((set, get) => ({
         error: null
       });
     } catch (error) {
+      console.error('❌ Error loading queue:', error);
       set({
         error: 'Network error. Please try again.',
         isLoading: false
@@ -85,6 +99,33 @@ export const useDiscoveryStore = create<DiscoveryStore>((set, get) => ({
       likedRestaurants: newLikedRestaurants,
       passedRestaurants: newPassedRestaurants
     });
+    
+    // Persist favorites to backend (fire and forget)
+    if (direction === 'right') {
+      import('../api').then(({ addFavorite }) => {
+        const authStore = localStorage.getItem('foodtok-auth');
+        if (authStore) {
+          try {
+            const { state } = JSON.parse(authStore);
+            const userId = state?.user?.id;
+            if (userId) {
+              const card = queue[currentIndex];
+              if (card) {
+                addFavorite(
+                  userId,
+                  restaurantId,
+                  card.restaurant.name,
+                  card.matchScore,
+                  card.restaurant.images?.[0] || ''
+                ).catch((err: Error) => console.error('Failed to persist favorite:', err));
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing auth store:', e);
+          }
+        }
+      });
+    }
     
     // If we're running low on cards, try to refill
     if (currentIndex + 2 >= queue.length) {
@@ -134,7 +175,27 @@ export const useDiscoveryStore = create<DiscoveryStore>((set, get) => ({
     const { queue } = get();
     
     try {
-      const response = await getDiscoveryRestaurants('default', 5);
+      console.log('🔄 Refilling queue with more restaurants');
+      
+      // Get user from auth store
+      const authStore = localStorage.getItem('foodtok-auth');
+      let preferences = null;
+      let userId = 'default';
+      
+      if (authStore) {
+        try {
+          const { state } = JSON.parse(authStore);
+          userId = state?.user?.id || 'default';
+          preferences = state?.user?.preferences;
+          console.log('👤 Refilling for user:', userId);
+          console.log('🎯 User preferences:', preferences);
+        } catch (e) {
+          console.error('Error parsing auth store:', e);
+        }
+      }
+      
+      const response = await getDiscoveryRestaurants(userId, 10, preferences);
+      console.log('✅ Added', response.length, 'more restaurants');
       
       set({
         queue: [...queue, ...response] as any
