@@ -246,18 +246,6 @@ User ID: user_04b4de00
 - [ ] Add activity tracking (UserActivity table)
 - [ ] Add reservation history page with filters
 
-### **Priority 2: User Experience** (2-3 weeks)
-- [ ] Add push notifications for reservation reminders
-- [ ] Implement restaurant reviews/ratings
-- [ ] Add photo upload for user profiles
-- [ ] Add search and filters to discovery feed
-
-### **Priority 3: Advanced Features** (1-2 months)
-- [ ] Recommendation algorithm (ML-based)
-- [ ] Group reservations
-- [ ] Loyalty points system
-- [ ] Restaurant partner dashboard
-- [ ] Payment integration (Stripe)
 
 ### **Priority 4: Infrastructure** (Ongoing)
 - [ ] Deploy to production environment
